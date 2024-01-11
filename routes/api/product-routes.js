@@ -58,37 +58,38 @@ router.post('/', (req, res) => {
 
 // update product
 router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+
   try {
-    await Product.update(req.body, { where: { id: req.params.id } });
+    const productData = {...req.body};
+    delete productData.id;
 
-    if (req.body.tags && req.body.tags.length > 0) {
-      const productTags = await ProductTag.findAll({ where: { product_id: req.params.id } });
-      const productTagIds = productTags.map(({ tag_id }) => tag_id);
+    const updateProduct = await Product.update(productData, { where: { id: id } 
+});
 
-      const newProductTags = req.body.tags
-        .filter((tag_id) => !productTagIds.includes(tag_id))
-        .map((tag_id) => {
-          return {
-            product_id: req.params.id,
-            tag_id,
-          };
-        });
+if (req.body.tags && req.body.tags.length > 0) {
+  const productTags = await ProductTag.findAll({ where: { product_id: id } });
+  const productTagIds = productTags.map(({ tag_id }) => tag_id);
 
-      const productTagsToRemove = productTags
-        .filter(({ tag_id }) => !req.body.tags.includes(tag_id))
-        .map(({ id }) => id);
-      
-      await Promise.all([
-        ProductTag.destroy({ where: { id: productTagsToRemove } }),
-        ProductTag.bulkCreate(newProductTags),
-      ]);
-    }
+  const newProductTags = req.body.tags
+    .filter((tag_id) => !productTagIds.includes(tag_id))
+    .map((tag_id) => ({ product_id: id, tag_id}));
 
-    const product = await Product.findByPk(req.params.id, { include: [{ model: Tag }] });
-    return res.status.json(product);
+    const productTagsToRemove = productTags
+      .filter(({ tag_id }) => !req.body.tags.includes(tag_id))
+      .map(({ id }) => id);
+
+    await Promise.all([
+      ProductTag.destroy({ where: { id: productTagsToRemove } }),
+      ProductTag.bulkCreate(newProductTags),
+    ]);
+  }
+
+  const updatedProduct = await Product.findByPk(id, { include: [{ model: Tag }] });
+  res.status(200).json(updatedProduct);
   } catch (err) {
-    console.log(error);
-    res.status(500).json({ message: 'Product update failed.' });
+    console.log(err);
+    res.status(500).json({ message: 'Update failed.' });
   }
 });
   
