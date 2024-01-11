@@ -56,39 +56,47 @@ router.post('/', (req, res) => {
     });
 });
 
-// update product
+// update product by ID
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
+    // Extract data from the request body
     const productData = {...req.body};
     delete productData.id;
-
+    // Update the product with the specified id
     const updateProduct = await Product.update(productData, { where: { id: id } 
 });
-
+// Check if there are tags associated with the updated product
 if (req.body.tags && req.body.tags.length > 0) {
   const productTags = await ProductTag.findAll({ where: { product_id: id } });
   const productTagIds = productTags.map(({ tag_id }) => tag_id);
 
+  // Create an array of new product tags to be added
   const newProductTags = req.body.tags
     .filter((tag_id) => !productTagIds.includes(tag_id))
     .map((tag_id) => ({ product_id: id, tag_id}));
 
+    // Create an array of product tags to be removed
     const productTagsToRemove = productTags
       .filter(({ tag_id }) => !req.body.tags.includes(tag_id))
       .map(({ id }) => id);
 
+    // Perform bulk operations to add new tags and remove old tags
     await Promise.all([
       ProductTag.destroy({ where: { id: productTagsToRemove } }),
       ProductTag.bulkCreate(newProductTags),
     ]);
   }
 
+  // Retrieve the updated product inclduing associated tags
   const updatedProduct = await Product.findByPk(id, { include: [{ model: Tag }] });
+
+  // Respond with the updated product data
   res.status(200).json(updatedProduct);
   } catch (err) {
     console.log(err);
+    // Handle errors
     res.status(500).json({ message: 'Update failed.' });
   }
 });
